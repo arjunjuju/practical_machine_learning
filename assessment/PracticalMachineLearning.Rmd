@@ -1,0 +1,70 @@
+---
+title: "PracticalMachineLearning"
+author: "ArjunVenkat"
+date: "October 24, 2015"
+output: html_document
+---
+##Practical Machine Learning 
+#Prediction Assignment Writeup
+This document describe the analysis done for the prediction assignment of the practical machine learning course.
+
+##Required Libraries
+The packages used in the analysis are as follows:
+```{r}
+options(warn=-1)
+library(caret)
+library(randomForest)
+library(Hmisc)
+library(foreach)
+library(doParallel)
+set.seed(4356)
+```
+The first step is to load the csv file data to dataframe and analyze the type & the completion rate of the data.
+```{r}
+data <- read.csv("pml-training.csv")
+summary(data)
+describe(data)
+sapply(data, class)
+str(data)
+```
+##Reading the data
+
+Read the training data into R, identifying "NA", "" and "#DIV/0!" as NA strings
+```{r}
+data <- read.csv("pml-training.csv", na.strings=c("#DIV/0!") )
+```
+And force the cast to numeric values for the specified columns 
+```{r}
+cData <- data
+for(i in c(8:ncol(cData)-1)) {cData[,i] = as.numeric(as.character(cData[,i]))}
+```
+To manage the second issue we will select as feature only the column with a 100% completion rate We will also eliminate some features like "X"", timestamps, "new_window" and "num_window". 
+
+```{r}
+featuresnames <- colnames(cData[colSums(is.na(cData)) == 0])[-(1:7)]
+features <- cData[featuresnames]
+```
+
+Spliting the data into training and test sets
+```{r}
+xdata <- createDataPartition(y=features$classe, p=3/4, list=FALSE )
+training <- features[xdata,]
+testing <- features[-xdata,]
+```
+Now we gonna process 4 random forest with 150 trees each and combine then to have a random forest model with a total of 600 trees.
+```{r}
+registerDoParallel()
+model <- foreach(ntree=rep(150, 4), .combine=randomForest::combine, .packages='randomForest') %dopar% randomForest(training[-ncol(training)], training$classe, ntree=ntree)
+```
+To evaluate the model we will use the confusionmatrix method and we will focus on accuracy, sensitivity & specificity metrics :
+```{r}
+predictionsTr <- predict(model, newdata=training)
+confusionMatrix(predictionsTr,training$classe)
+
+
+predictionsTe <- predict(model, newdata=testing)
+confusionMatrix(predictionsTe,testing$classe)
+```
+
+##Conclusion
+As seen by the result of the confusionmatrix, the model is good and efficient because it has an accuracy of 0.997 and very good sensitivity & specificity values on the testing dataset.Also i accumulated 20/20 in Coursera Assignment Submission which proves it efficiency.
